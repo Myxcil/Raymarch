@@ -15,6 +15,9 @@ Shader "Hidden/Raymarching"
 	uniform sampler2D _MainTex;
 	uniform sampler2D _RayTexture;
 	uniform sampler3D _Volume;
+	
+	uniform sampler2D _JitterTex;
+	uniform float _JitterStrength;
 
 	uniform float3 _Absorption;
 	uniform float _Density;
@@ -91,8 +94,9 @@ Shader "Hidden/Raymarching"
 		if (nSamples <= 0)
 			return 0;
 
+		float offset = 1.0f + _JitterStrength * tex2D(_JitterTex, uv * 0.25).r;
 		float3 stepVec = normalize((ray.xyz - _CameraTS.xyz) * _GridDim.xyz) * _rcpGridDim.xyz;
-		float4 p = float4(ray.xyz + stepVec, 0);
+		float4 p = float4(ray.xyz + stepVec * offset, 0);
 
 		float4 result = float4(1, 1, 1, 0);
 		for(int i=0; i < nSamples; ++i)

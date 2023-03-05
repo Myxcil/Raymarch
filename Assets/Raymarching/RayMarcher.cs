@@ -37,6 +37,7 @@ namespace VolumeRendering
         private readonly Vector3 gridScale;
         private readonly Vector4 gridDim;
         private readonly Vector4 rcpGridDim;
+        private Texture2D jitterTex;
 
         private readonly Material matBlurShader;
         private int currBlurPasses;
@@ -52,6 +53,8 @@ namespace VolumeRendering
         public RayMarcher(RenderTexture volumeTexture, Vector3 volumeSize, int raycastResolution, Shader volume, Shader raymarch, Shader blur)
         {
             CreateRenderTargets(raycastResolution);
+
+            CreateJitterTexture(256);
 
             Vector3 v = new Vector3(volumeTexture.width, volumeTexture.height, volumeTexture.volumeDepth);
             float maxDim = Mathf.Max(Mathf.Max(v.x, v.y), v.z);
@@ -76,6 +79,7 @@ namespace VolumeRendering
 
             rayMarchMaterial = new Material(raymarch);
             rayMarchMaterial.SetTexture("_Volume", volumeTexture);
+            rayMarchMaterial.SetTexture("_JitterTex", jitterTex);
             rayMarchMaterial.SetVector("_GridDim", gridDim);
             rayMarchMaterial.SetVector("_rcpGridDim", rcpGridDim);
 
@@ -134,6 +138,25 @@ namespace VolumeRendering
                 wrapMode = TextureWrapMode.Clamp
             };
             idRayMarchLayer = new RenderTargetIdentifier(rayMarchLayer);
+        }
+
+        //-----------------------------------------------------------------------------------------------------------------------------------------
+        private void CreateJitterTexture(int resolution)
+        {
+            jitterTex = new Texture2D(resolution, resolution, TextureFormat.ARGB32, false)
+            {
+                name = "JitterTex",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+
+            Color32[] pixels = jitterTex.GetPixels32();
+            for (int i = 0; i < pixels.Length; ++i)
+            {
+                pixels[i] = new Color(Random.value, Random.value, Random.value, Random.value);
+            }
+
+            jitterTex.SetPixels32(pixels);
+            jitterTex.Apply();
         }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
@@ -298,10 +321,11 @@ namespace VolumeRendering
         }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
-        public void Apply(float absorption, float density)
+        public void Apply(float absorption, float density, float jitterStrength)
         {
             rayMarchMaterial.SetFloat("_Absorption", absorption);
             rayMarchMaterial.SetFloat("_Density", density);
+            rayMarchMaterial.SetFloat("_JitterStrength", jitterStrength);
         }
     }
 }

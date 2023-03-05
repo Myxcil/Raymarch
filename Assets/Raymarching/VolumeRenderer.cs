@@ -35,6 +35,9 @@ namespace VolumeRendering
         private float edgeDetectionThreshold = 0.01f;
         [SerializeField]
         private int numBlurPasses = 0;
+        [SerializeField]
+        private float jitterStrength = 1.0f;
+
         //----------------------------------------------------------------------------------------------------------------------------------------------
         [Header("Debug")]
         public bool showGrid = false;
@@ -112,7 +115,7 @@ namespace VolumeRendering
         {
             if (rayMarcher != null)
             {
-                rayMarcher.Apply(absorption, density);
+                rayMarcher.Apply(absorption, density, jitterStrength);
             }
         }
 
