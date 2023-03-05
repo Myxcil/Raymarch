@@ -2,11 +2,11 @@
 #define NUM_THREADS_X 8
 #define NUM_THREADS_Y 8
 #define NUM_THREADS_Z 8
-#define NOISE_SCALE 3.0
 
 //--------------------------------------------------------------------------------------------------------------------------------------------------
+#include "Assets/Raymarching/Shader/Random.cginc"
 //#include "Assets/Raymarching/Shader/SimplexNoise3D.cginc"
-//#include "Assets/Raymarching/Shader/Noise.cginc"
+#include "Assets/Raymarching/Shader/PerlinNoise.cginc"
 #include "Assets/Raymarching/Shader/WorleyNoise.cginc"
 
 //--------------------------------------------------------------------------------------------------------------------------------------------------
@@ -16,12 +16,35 @@ RWTexture3D<float4> outputFloat4;
 float2 time;	// x=Time.deltaTime, y=Time.time
 
 //--------------------------------------------------------------------------------------------------------------------------------------------------
+float remap(float v, float l0, float h0, float l1, float h1)
+{
+	return l1 + (v - l0) * (h1 - l1) / (h0 - l0);
+}
+
+#define PEAK_HEIGHT 0.7
+#define ANVIL_AMOUNT 0.3
+#define GLOBAL_COVERAGE 0.8
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------
 #pragma kernel Init
 [numthreads(NUM_THREADS_X,NUM_THREADS_Y,NUM_THREADS_Z)]
 void Init(uint3 id : SV_DispatchThreadID)
 {
-	float3 v = rcpResolution * id * NOISE_SCALE;
-	outputFloat4[id] = 1 - WorleyNoise(v);
+	float3 v = rcpResolution * id;
+
+	// cloud coverage
+	float loNoise = 2.0 * (0.5 - WorleyNoise(v.xz * 2.0));
+	float hiNoise = PerlinNoise(v * 47.0);
+
+	// height altering
+	float percent_height = v.y;
+	float roundness = saturate(remap(percent_height, 0.0, 0.07, 0.0, 1.0));
+	float stop_height = saturate(PEAK_HEIGHT + 0.12);
+	roundness *= saturate(remap(percent_height, stop_height * 0.2, stop_height, 1.0, 0.0));
+
+	roundness = pow(roundness, saturate(remap(percent_height, 0.65, 0.95, 1.0, (1-ANVIL_AMOUNT*GLOBAL_COVERAGE))));
+
+	outputFloat4[id] = saturate(loNoise * hiNoise * roundness);
 }
 
 //--------------------------------------------------------------------------------------------------------------------------------------------------
@@ -29,6 +52,4 @@ void Init(uint3 id : SV_DispatchThreadID)
 [numthreads(NUM_THREADS_X,NUM_THREADS_Y,NUM_THREADS_Z)]
 void Update(uint3 id : SV_DispatchThreadID)
 {
-	float3 v = rcpResolution * id * NOISE_SCALE;
-	outputFloat4[id] = 1 - WorleyNoise(v, time.y);
 }

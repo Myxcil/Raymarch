@@ -1,18 +1,26 @@
 ﻿//--------------------------------------------------------------------------------------------------------------------------------------------------
 // https://thebookofshaders.com/10/
 //--------------------------------------------------------------------------------------------------------------------------------------------------
-float random(float3 v)
+float PerlinNoise(float2 v)
 {
-	return frac(sin(dot(v.xyz, float3(12.9898, 78.233, 159.351))) * 43758.5453123);
-}
+	float2 i = floor(v);
+	float2 f = frac(v);
 
-float2 random2(float3 v) 
-{
-    return frac(sin(float2(dot(v.xy,float2(127.1,311.7)),dot(v.zy,float2(269.5,183.3))))*43758.5453);
+	float2 t = f * f * (3.0 - 2.0 * f); // cubic hermite
+	
+	float x0y0 = random(i);
+	float x1y0 = random(i + float2(1,0));
+	float x0y1 = random(i + float2(0,1));
+	float x1y1 = random(i + float2(1,1));
+
+	float y0 = lerp(x0y0, x1y0, t.x);
+	float y1 = lerp(x0y1, x1y1, t.x);
+
+	return lerp(y0, y1, t.y);
 }
 
 //--------------------------------------------------------------------------------------------------------------------------------------------------
-float noise(float3 v)
+float PerlinNoise(float3 v)
 {
 	float3 i = floor(v);
 	float3 f = frac(v);

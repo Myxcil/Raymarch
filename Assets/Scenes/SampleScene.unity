@@ -252,18 +252,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   computeShader: {fileID: 7200000, guid: 12621c17a2e0a6b4386c48a118301011, type: 3}
-  maxResolution: 128
-  gridSize: 0.1
+  maxResolution: 512
+  gridSize: 0.05
   volume: {fileID: 4800000, guid: db4edd93b547c94438087ed90fe5ad38, type: 3}
   raymarch: {fileID: 4800000, guid: 1d6d9a1c8e2d21941887cf2b665d477a, type: 3}
   raycastResolution: 2
   blur: {fileID: 4800000, guid: 403560e8d5f20e647ad312127ae0cc2c, type: 3}
   absorption: 1
-  density: 0.01
+  density: 0.5
   edgeDetectionThreshold: 0.01
   numBlurPasses: 0
-  jitterStrength: 1
-  showGrid: 0
+  jitterStrength: 0
+  showGrid: 1
 --- !u!4 &543627894
 Transform:
   m_ObjectHideFlags: 0

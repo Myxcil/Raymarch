@@ -2,7 +2,8 @@
 // https://www.shadertoy.com/view/XsX3zB 
 //--------------------------------------------------------------------------------------------------------------------------------------------------
 /* discontinuous pseudorandom uniformly distributed in [-0.5, +0.5]^3 */
-float3 random3(float3 c) {
+float3 random3(float3 c) 
+{
 	float j = 4096.0*sin(dot(c,float3(17.0, 59.4, 15.0)));
 	float3 r;
 	r.z = frac(512.0*j);
@@ -18,7 +19,8 @@ const float F3 =  0.3333333;
 const float G3 =  0.1666667;
 
 /* 3d simplex noise */
-float simplex3d(float3 p) {
+float simplex3d(float3 p) 
+{
 	 /* 1. find current tetrahedron T and it's four vertices */
 	 /* s, s+i1, s+i2, s+1.0 - absolute skewed (integer) coordinates of T vertices */
 	 /* x, x1, x2, x3 - unskewed coordinates of p relative to each of T vertices*/
@@ -70,7 +72,8 @@ const float3x3 rot2 = float3x3(-0.55,-0.39, 0.74, 0.33,-0.91,-0.24,0.77, 0.12,0.
 const float3x3 rot3 = float3x3(-0.71, 0.52,-0.47,-0.08,-0.72,-0.68,-0.7,-0.45,0.56);
 
 /* directional artifacts can be reduced by rotating each octave */
-float simplex3d_fractal(float3 m) {
+float simplex3d_fractal(float3 m) 
+{
     return   0.5333333*simplex3d(mul(m,rot1))
 			+0.2666667*simplex3d(2.0*mul(m,rot2))
 			+0.1333333*simplex3d(4.0*mul(m,rot3))
