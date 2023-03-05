@@ -53,6 +53,8 @@ namespace VolumeRendering
         {
             meshRenderer = GetComponent<MeshRenderer>();
             
+            // setup material which will render the final image of the
+            // raymarch to the scene
             volumeMaterial = meshRenderer.material;
             volumeMaterial.DisableKeyword("_ALPHATEST_ON");
             volumeMaterial.EnableKeyword("_ALPHABLEND_ON");
@@ -63,9 +65,11 @@ namespace VolumeRendering
         //----------------------------------------------------------------------------------------------------------------------------------------------
         private void Start()
         {
+            // calculate resolution of grid depending on size of the current gameobject
             Vector3 scale = transform.localScale;
             GetResolution(scale, gridSize, maxResolution, out int width, out int height, out int depth);
 
+            // create 3d texture which is used as a source for raymarching
             volumeTexture = new RenderTexture(width, height, 0, RenderTextureFormat.ARGBHalf);
             volumeTexture.dimension = TextureDimension.Tex3D;
             volumeTexture.volumeDepth = depth;
@@ -74,10 +78,13 @@ namespace VolumeRendering
             volumeTexture.filterMode = FilterMode.Bilinear;
             volumeTexture.Create();
 
+            // initialize the raymarching
             rayMarcher = new RayMarcher(volumeTexture, scale, raycastResolution, volume, raymarch, blur);
 
+            // assign raymarching output texture
             volumeMaterial.mainTexture = rayMarcher.Result;
 
+            // intialize and run a compute shader to create the volume texture
             threadSetup.CalculateThreadCount(width, height, depth);
 
             int kCSMain = computeShader.FindKernel("CSMain");
