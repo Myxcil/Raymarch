@@ -4,18 +4,20 @@
 #define NUM_THREADS_Z 8
 
 //--------------------------------------------------------------------------------------------------------------------------------------------------
+//#include "Assets/Raymarching/Shader/SimplexNoise3D.cginc"
+//#include "Assets/Raymarching/Shader/Noise.cginc"
+#include "Assets/Raymarching/Shader/WorleyNoise.cginc"
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------
 int3 resolution;
 float3 rcpResolution;
 RWTexture3D<float4> outputFloat4;
-
-//#include "Assets/Raymarching/Shader/SimplexNoise3D.cginc"
-#include "Assets/Raymarching/Shader/Noise.cginc"
 
 //--------------------------------------------------------------------------------------------------------------------------------------------------
 #pragma kernel CSMain
 [numthreads(NUM_THREADS_X,NUM_THREADS_Y,NUM_THREADS_Z)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-	float3 v = rcpResolution * id * 10.0;
-	outputFloat4[id] = noise(v);
+	float3 v = rcpResolution * id * 4.0;
+	outputFloat4[id] = 1 - WorleyNoise(v);
 }
