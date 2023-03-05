@@ -8,18 +8,34 @@ namespace VolumeRendering
     public class VolumeRenderer : MonoBehaviour
     {
         //----------------------------------------------------------------------------------------------------------------------------------------------
+        [Header("Volume Init")]
         [SerializeField]
-        private Setup setup = new Setup();
+        private ComputeShader computeShader = null;
         [SerializeField]
-        private Resolution resolution = Resolution.DEFAULT;
+        private int maxResolution = 128;
         [SerializeField]
-        private FilterMode volumeTextureFilter = FilterMode.Bilinear;
+        private float gridSize = 0.1f;
+        //----------------------------------------------------------------------------------------------------------------------------------------------
+        [Header("Raymarching")]
+        [SerializeField]
+        private Shader volume = null;
+        [SerializeField]
+        private Shader raymarch = null;
+        [SerializeField]
+        private int raycastResolution = 2;
+        [SerializeField]
+        private Shader blur = null;
+        //----------------------------------------------------------------------------------------------------------------------------------------------
+        [Header("Runtime Parameter")]
         [SerializeField]
         private float absorption = 0.5f;
         [SerializeField]
         private float density = 0.75f;
         [SerializeField]
-        private ComputeShader computeShader = null;
+        private float edgeDetectionThreshold = 0.01f;
+        [SerializeField]
+        private int numBlurPasses = 0;
+        //----------------------------------------------------------------------------------------------------------------------------------------------
         [Header("Debug")]
         public bool showGrid = false;
 
@@ -46,18 +62,17 @@ namespace VolumeRendering
         private void Start()
         {
             Vector3 scale = transform.localScale;
-
-            Setup.GetResolution(scale, resolution.gridSize, resolution.maxRes, out int width, out int height, out int depth);
+            GetResolution(scale, gridSize, maxResolution, out int width, out int height, out int depth);
 
             volumeTexture = new RenderTexture(width, height, 0, RenderTextureFormat.ARGBHalf);
             volumeTexture.dimension = TextureDimension.Tex3D;
             volumeTexture.volumeDepth = depth;
             volumeTexture.enableRandomWrite = true;
             volumeTexture.wrapMode = TextureWrapMode.Clamp;
-            volumeTexture.filterMode = volumeTextureFilter;
+            volumeTexture.filterMode = FilterMode.Bilinear;
             volumeTexture.Create();
 
-            rayMarcher = new RayMarcher(setup, resolution, volumeTexture, scale);
+            rayMarcher = new RayMarcher(volumeTexture, scale, raycastResolution, volume, raymarch, blur);
 
             volumeMaterial.mainTexture = rayMarcher.Result;
 
@@ -99,7 +114,7 @@ namespace VolumeRendering
         {
             if (rayMarcher != null)
             {
-                rayMarcher.OnRenderObject(Camera.current, meshRenderer);
+                rayMarcher.OnRenderObject(Camera.current, meshRenderer, edgeDetectionThreshold, numBlurPasses);
             }
         }
 
@@ -120,7 +135,7 @@ namespace VolumeRendering
 
             if (showGrid)
             {
-                DrawCubeGrid(transform.localScale, resolution.gridSize, resolution.maxRes);
+                DrawCubeGrid(transform.localScale, gridSize, maxResolution);
             }
 
             Gizmos.matrix = mOld;
@@ -134,7 +149,7 @@ namespace VolumeRendering
             Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
 
             int[] dim = new int[3];
-            Setup.GetResolution(scale, gridScale, maxRes, out dim[0], out dim[1], out dim[2]);
+            GetResolution(scale, gridScale, maxRes, out dim[0], out dim[1], out dim[2]);
 
             Vector3 size = new(1.0f / dim[0], 1.0f / dim[1], 1.0f / dim[2]);
 
@@ -216,6 +231,73 @@ namespace VolumeRendering
         private void Dispatch(int kernel)
         {
             computeShader.Dispatch(kernel, threadSetup.numX, threadSetup.numY, threadSetup.numZ);
+        }
+
+        //----------------------------------------------------------------------------------------------------------------------------------------------
+        private static Vector3 CalculateGridSize(Vector3 size, float gridScale, int maxRes)
+        {
+            GetResolution(size, gridScale, maxRes, out int width, out int height, out int depth);
+            return new Vector3(size.x / width, size.y / height, size.z / depth);
+        }
+
+        //---------------------------------------------------------------------------------------------------------------------------------------------
+        private static void GetResolution(Vector3 size, float gridSize, int maxRes, out int width, out int height, out int depth)
+        {
+            size /= gridSize;
+
+            if (size.x >= size.y && size.x >= size.z)
+            {
+                width = SetDimension(size.x, maxRes);
+                height = SetDimension(size.y * width / size.x);
+                depth = SetDimension(size.z * width / size.x);
+            }
+            else if (size.y >= size.x && size.y >= size.z)
+            {
+                height = SetDimension(size.y, maxRes);
+                width = SetDimension(size.x * height / size.y);
+                depth = SetDimension(size.z * height / size.y);
+            }
+            else
+            {
+                depth = SetDimension(size.z, maxRes);
+                width = SetDimension(size.x * depth / size.z);
+                height = SetDimension(size.y * depth / size.z);
+            }
+        }
+
+        //---------------------------------------------------------------------------------------------------------------------------------------------
+        private static readonly int[] SnapValues = { 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 128 };
+
+        //---------------------------------------------------------------------------------------------------------------------------------------------
+        private static int SetDimension(float fValue, int maxRes = 0)
+        {
+            int iValue = Mathf.RoundToInt(fValue);
+            if (iValue <= SnapValues[0])
+            {
+                iValue = SnapValues[0];
+            }
+            else if (iValue >= SnapValues[SnapValues.Length - 1])
+            {
+                iValue = SnapValues[SnapValues.Length - 1];
+            }
+            else
+            {
+                for (int i = 1; i < SnapValues.Length; ++i)
+                {
+                    int dp = iValue - SnapValues[i - 1];
+                    int dn = SnapValues[i] - iValue;
+                    if (dp >= 0 && dn >= 0)
+                    {
+                        iValue = dp < dn ? SnapValues[i - 1] : SnapValues[i];
+                        break;
+                    }
+                }
+            }
+            if (maxRes > 0)
+            {
+                iValue = Mathf.Min(maxRes, iValue);
+            }
+            return iValue;
         }
     }
 }

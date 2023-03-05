@@ -73,9 +73,9 @@ Shader "Hidden/Raymarching/Raymarching"
 	}
 
 	//--------------------------------------------------------------------------------------------------------------------------------------
-	float4 Raycast(sampler2D rayTexture, float2 rt, float3 gridPos, float3 view)
+	float4 Raycast(sampler2D rayTexture, float2 uv, float3 gridPos, float3 view)
 	{
-		float4 ray = tex2D(rayTexture, rt);
+		float4 ray = tex2D(rayTexture, uv);
 		if (ray.x < -1)
 			return 0;
 
@@ -92,7 +92,7 @@ Shader "Hidden/Raymarching/Raymarching"
 		if (nSamples <= 0)
 			return 0;
 
-		float offset = tex2D(_JitterTex, rt * 0.25).r;
+		float offset = tex2D(_JitterTex, uv * 0.25).r;
 
 		float3 stepVec = normalize((ray.xyz - _CameraTS.xyz) * _GridDim.xyz) * _rcpGridDim.xyz;
 		float4 p = float4(ray.xyz + stepVec * offset, 0);

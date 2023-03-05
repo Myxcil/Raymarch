@@ -9,9 +9,6 @@ namespace VolumeRendering
     class RayMarcher
     {
         //------------------------------------------------------------------------------------------------------------------------------------------
-        private readonly RenderTexture volumeTexture;
-
-        //------------------------------------------------------------------------------------------------------------------------------------------
         private struct VolumeSetup
         {
             public Matrix4x4 invMVP;
@@ -53,7 +50,7 @@ namespace VolumeRendering
         private readonly Vector4 rcpGridDim;
 
         private readonly Material matBlurShader;
-        private readonly int numBlurPasses;
+        private int currBlurPasses;
 
         //-----------------------------------------------------------------------------------------------------------------------------------------     
         private CameraEvent cameraEvent;
@@ -63,11 +60,9 @@ namespace VolumeRendering
         public Texture Result { get { return rayMarchLayer; } }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------     
-        public RayMarcher(Setup setup, Resolution resolution, RenderTexture volumeTex, Vector3 volumeSize)
+        public RayMarcher(RenderTexture volumeTexture, Vector3 volumeSize, int raycastResolution, Shader volume, Shader raymarch, Shader blur)
         {
-            volumeTexture = volumeTex;
-
-            CreateRenderTargets(resolution);
+            CreateRenderTargets(raycastResolution);
 
             CreateNoiseTexture(256);
 
@@ -78,14 +73,13 @@ namespace VolumeRendering
             gridScale = new Vector3(gridDim.x / volumeSize.x, gridDim.y / volumeSize.y, gridDim.z / volumeSize.z);
             rcpGridDim = new Vector4(0.5f / gridDim.x, 0.5f / gridDim.y, 0.5f / gridDim.z, 0.5f / gridDim.w);
 
-            volumeMaterial = new Material(setup.shaderVolume);
+            volumeMaterial = new Material(volume);
             if (rayDataSmall != null)
             {
                 Vector4 rayTexelSize = Vector4.zero;
                 rayTexelSize.x = 1.0f / rayDataSmall.width;
                 rayTexelSize.y = 1.0f / rayDataSmall.height;
                 volumeMaterial.SetVector("TexelSize", rayTexelSize);
-                volumeMaterial.SetFloat("EdgeThreshold", setup.edgeDetectionThreshold);
                 volumeMaterial.mainTexture = rayDataSmall;
             }
             else
@@ -93,18 +87,14 @@ namespace VolumeRendering
                 volumeMaterial.mainTexture = rayData;
             }
 
-            rayMarchMaterial = new Material(setup.shaderRaymarch);
+            rayMarchMaterial = new Material(raymarch);
             rayMarchMaterial.SetTexture("_Volume", volumeTexture);
             rayMarchMaterial.SetTexture("_JitterTex", jitterTex);
             rayMarchMaterial.SetVector("_GridDim", gridDim);
             rayMarchMaterial.SetVector("_rcpGridDim", rcpGridDim);
 
-            matBlurShader = new Material(setup.blurShader);
+            matBlurShader = new Material(blur);
             matBlurShader.hideFlags = HideFlags.HideAndDontSave;
-
-            numBlurPasses = resolution.numBlurPasses;
-
-            cameraEvent = setup.cameraEvent;
         }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
@@ -123,14 +113,14 @@ namespace VolumeRendering
         }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
-        private void CreateRenderTargets(Resolution resolution)
+        private void CreateRenderTargets(int raycastResolution)
         {
             int targetWidth = Screen.width;
             int targetHeight = Screen.height;
 
-            if (resolution.raycastResolution > 0)
+            if (raycastResolution > 0)
             {
-                float rcpRes = 1.0f / resolution.raycastResolution;
+                float rcpRes = 1.0f / raycastResolution;
                 targetWidth = Mathf.RoundToInt(rcpRes * targetWidth);
                 targetHeight = Mathf.RoundToInt(rcpRes * targetHeight);
             }
@@ -142,7 +132,7 @@ namespace VolumeRendering
             };
             idRayData = new RenderTargetIdentifier(rayData);
 
-            if (resolution.raycastResolution > 1)
+            if (raycastResolution > 1)
             {
                 rayDataSmall = new RenderTexture(targetWidth, targetHeight, 0, RenderTextureFormat.ARGBHalf)
                 {
@@ -227,14 +217,25 @@ namespace VolumeRendering
         }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
-        public void OnRenderObject(Camera camera, MeshRenderer renderer)
+        public void OnRenderObject(Camera camera, MeshRenderer renderer, float edgeDetectionThreshold, int numBlurPasses)
         {
-            if (!cameraCommands.ContainsKey(camera))
+            if (!cameraCommands.TryGetValue(camera, out CommandBuffer commandBuffer) || currBlurPasses != numBlurPasses)
             {
-                CommandBuffer commandBuffer = CreateCommandBuffer(renderer);
-                camera.AddCommandBuffer(cameraEvent, commandBuffer);
-                cameraCommands.Add(camera, commandBuffer);
+                currBlurPasses = numBlurPasses;
+                if (commandBuffer == null)
+                {
+                    commandBuffer = new CommandBuffer() { name = "RenderVolume" };
+                    camera.AddCommandBuffer(cameraEvent, commandBuffer);
+                    cameraCommands.Add(camera, commandBuffer);
+                }
+                else
+                {
+                    commandBuffer.Clear();
+                }
+                FillCommandBuffer(commandBuffer, renderer);
             }
+
+            volumeMaterial.SetFloat("EdgeThreshold", edgeDetectionThreshold);
 
             SetupVolumeTracing(camera, renderer.localToWorldMatrix);
 
@@ -242,13 +243,8 @@ namespace VolumeRendering
         }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
-        private CommandBuffer CreateCommandBuffer(MeshRenderer renderer)
+        private void FillCommandBuffer(CommandBuffer cmdVolume, MeshRenderer renderer)
         {
-            CommandBuffer cmdVolume = new CommandBuffer
-            {
-                name = "RenderVolume"
-            };
-
             cmdVolume.SetRenderTarget(idRayData);
             cmdVolume.ClearRenderTarget(false, true, Color.clear);
             cmdVolume.DrawRenderer(renderer, volumeMaterial, 0, VOLUME_PASS_BACK_FACES);
@@ -282,12 +278,12 @@ namespace VolumeRendering
             }
 
             // Blur result
-            if (numBlurPasses > 0)
+            if (currBlurPasses > 0)
             {
                 int idTempBlur = Shader.PropertyToID("_BlurTemp");
                 cmdVolume.GetTemporaryRT(idTempBlur, -1, -1, 0, FilterMode.Trilinear, RenderTextureFormat.Default);
 
-                for (int i = 0; i < numBlurPasses; ++i)
+                for (int i = 0; i < currBlurPasses; ++i)
                 {
                     cmdVolume.Blit(idRayMarchLayer, idTempBlur, matBlurShader, BLUR_PASS_HORIZONTAL);
                     cmdVolume.Blit(idTempBlur, idRayMarchLayer, matBlurShader, BLUR_PASS_VERTICAL);
@@ -295,8 +291,6 @@ namespace VolumeRendering
 
                 cmdVolume.ReleaseTemporaryRT(idTempBlur);
             }
-
-            return cmdVolume;
         }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
