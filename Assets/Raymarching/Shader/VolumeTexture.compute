@@ -22,8 +22,8 @@ float remap(float v, float l0, float h0, float l1, float h1)
 }
 
 #define PEAK_HEIGHT 0.7
-#define ANVIL_AMOUNT 0.3
-#define GLOBAL_COVERAGE 0.8
+#define ANVIL_AMOUNT 1.0
+#define GLOBAL_COVERAGE 1.0
 
 //--------------------------------------------------------------------------------------------------------------------------------------------------
 #pragma kernel Init
@@ -34,7 +34,7 @@ void Init(uint3 id : SV_DispatchThreadID)
 
 	// cloud coverage
 	float loNoise = 2.0 * (0.5 - WorleyNoise(v.xz * 2.0));
-	float hiNoise = PerlinNoise(v * 47.0);
+	float hiNoise = PerlinNoise(v * 23.0);
 
 	// height altering
 	float percent_height = v.y;

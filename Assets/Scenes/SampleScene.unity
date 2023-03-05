@@ -259,11 +259,11 @@ MonoBehaviour:
   raycastResolution: 2
   blur: {fileID: 4800000, guid: 403560e8d5f20e647ad312127ae0cc2c, type: 3}
   absorption: 1
-  density: 0.5
-  edgeDetectionThreshold: 0.01
-  numBlurPasses: 0
-  jitterStrength: 0
-  showGrid: 1
+  density: 0.05
+  edgeDetectionThreshold: 0.002
+  numBlurPasses: 2
+  jitterStrength: 1
+  showGrid: 0
 --- !u!4 &543627894
 Transform:
   m_ObjectHideFlags: 0

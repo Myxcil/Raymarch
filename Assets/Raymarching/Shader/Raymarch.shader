@@ -70,7 +70,7 @@ Shader "Hidden/Raymarching"
 	void SampleVolume(float weight, float4 p, inout float4 result)
 	{
 		float4 s = tex3Dlod(_Volume, p);
-		result.xyz *= 1 - saturate(s.xyz * _Absorption);
+		result.xyz *= 1.0 - saturate(s.xyz * _Absorption);
 		result.w += _Density * s.z * (1 - result.w);
 	}
 
