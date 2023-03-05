@@ -43,7 +43,7 @@ namespace VolumeRendering
         private int currBlurPasses;
 
         //-----------------------------------------------------------------------------------------------------------------------------------------     
-        private CameraEvent cameraEvent;
+        private CameraEvent cameraEvent = CameraEvent.BeforeForwardAlpha;
         private readonly Dictionary<Camera, CommandBuffer> cameraCommands = new Dictionary<Camera, CommandBuffer>();
 
         //-----------------------------------------------------------------------------------------------------------------------------------------     
@@ -236,32 +236,23 @@ namespace VolumeRendering
                 cmdVolume.Blit(idRayData, idRayDataSmall);
                 cmdVolume.Blit(idRayDataSmall, idRayEdges, volumeMaterial, VOLUME_PASS_EDGE_FILTER);
             }
-            
+
             // Step 3:
-            // Do the actual raymarching and create an intermediate output
+            // Do the actual raymarching 
             if (rayDataSmall != null)
             {
                 cmdVolume.Blit(idRayDataSmall, idRayMarchRenderTarget, rayMarchMaterial, RAYMARCH_PASS_RAYCAST_VOLUME);
-            }
-            else
-            {
-                cmdVolume.Blit(idRayData, idRayMarchRenderTarget, rayMarchMaterial, RAYMARCH_PASS_RAYCAST_VOLUME);
-            }
-
-            // Step 4:
-            // Combine the raymarching result with the edge cases which will be raycasted at a higher resolution
-            if (rayEdges != null)
-            {
+                
                 cmdVolume.SetGlobalTexture("_EdgeLookup", idRayEdges);
                 cmdVolume.SetGlobalTexture("_RayTexture", idRayData);
                 cmdVolume.Blit(idRayMarchRenderTarget, idRayMarchLayer, rayMarchMaterial, RAYMARCH_PASS_COMBINE_SCENE_EDGEFILTER);
             }
             else
             {
-                cmdVolume.Blit(idRayMarchRenderTarget, idRayMarchLayer, rayMarchMaterial, RAYMARCH_PASS_COMBINE_SCENE_SIMPLE);
+                cmdVolume.Blit(idRayData, idRayMarchLayer, rayMarchMaterial, RAYMARCH_PASS_RAYCAST_VOLUME);
             }
 
-            // Step 5:
+            // Step 4:
             // Blur the resulting texture, which will then be rendered into the scene afterwards
             if (currBlurPasses > 0)
             {

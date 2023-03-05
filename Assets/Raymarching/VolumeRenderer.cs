@@ -49,6 +49,8 @@ namespace VolumeRendering
 
         private RenderTexture volumeTexture;
 
+        private int kernelUpdate;
+
         //----------------------------------------------------------------------------------------------------------------------------------------------
         void Awake()
         {
@@ -88,11 +90,13 @@ namespace VolumeRendering
             // intialize and run a compute shader to create the volume texture
             threadSetup.CalculateThreadCount(width, height, depth);
 
-            int kCSMain = computeShader.FindKernel("CSMain");
+            int kInit = computeShader.FindKernel("Init");
             computeShader.SetInts("resolution", width, height, depth);
             computeShader.SetFloats("rcpResolution", 1.0f / width, 1.0f / height, 1.0f / depth);
-            computeShader.SetTexture(kCSMain, "outputFloat4", volumeTexture);
-            Dispatch(kCSMain);
+            computeShader.SetTexture(kInit, "outputFloat4", volumeTexture);
+            Dispatch(kInit);
+
+            kernelUpdate = computeShader.FindKernel("Update");
         }
 
         //----------------------------------------------------------------------------------------------------------------------------------------------
@@ -113,6 +117,13 @@ namespace VolumeRendering
         //----------------------------------------------------------------------------------------------------------------------------------------------
         void Update()
         {
+            if (kernelUpdate != 0)
+            {
+                computeShader.SetFloats("time", Time.deltaTime, Time.time);
+                computeShader.SetTexture(kernelUpdate, "outputFloat4", volumeTexture);
+                Dispatch(kernelUpdate);
+            }
+
             if (rayMarcher != null)
             {
                 rayMarcher.Apply(absorption, density, jitterStrength);
