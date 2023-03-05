@@ -258,6 +258,7 @@ MonoBehaviour:
   raymarch: {fileID: 4800000, guid: 1d6d9a1c8e2d21941887cf2b665d477a, type: 3}
   raycastResolution: 2
   blur: {fileID: 4800000, guid: 403560e8d5f20e647ad312127ae0cc2c, type: 3}
+  jitterStrength: 1
   absorption: 1
   density: 0.05
   edgeDetectionThreshold: 0.01
@@ -272,7 +273,7 @@ Transform:
   m_GameObject: {fileID: 543627892}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0.5, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 4, y: 1, z: 4}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -597,8 +598,8 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
-  m_LocalRotation: {x: -0.018141568, y: 0.95190316, z: -0.057478637, w: -0.3004123}
-  m_LocalPosition: {x: 1.0076894, y: 0.6131537, z: 1.5161679}
+  m_LocalRotation: {x: -0.05661534, y: 0.9429105, z: -0.21611509, w: -0.24699983}
+  m_LocalPosition: {x: 1.8222709, y: 1.9299676, z: 3.386162}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

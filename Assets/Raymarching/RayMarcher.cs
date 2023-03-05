@@ -9,16 +9,6 @@ namespace VolumeRendering
     class RayMarcher
     {
         //------------------------------------------------------------------------------------------------------------------------------------------
-        private struct VolumeSetup
-        {
-            public Matrix4x4 invMVP;
-            public Vector3 camPos;
-            public float sampleScale;
-            public Vector4 camNearPos;
-        }
-        private VolumeSetup volumeSetup;
-
-        //------------------------------------------------------------------------------------------------------------------------------------------
         private RenderTexture rayData;
         private RenderTargetIdentifier idRayData;
         private RenderTexture rayDataSmall;
@@ -95,21 +85,6 @@ namespace VolumeRendering
 
             matBlurShader = new Material(blur);
             matBlurShader.hideFlags = HideFlags.HideAndDontSave;
-        }
-
-        //-----------------------------------------------------------------------------------------------------------------------------------------
-        private Vector3 CaluclateNearPlanePosition(Camera camera)
-        {
-            float yFac = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
-            float xFac = camera.aspect * yFac;
-
-            float near = camera.nearClipPlane;
-
-            Vector3 nearPos = Vector3.forward * near;
-            nearPos += Vector3.right * near * xFac;
-            nearPos += Vector3.up * near * yFac;
-
-            return nearPos;
         }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
@@ -237,9 +212,7 @@ namespace VolumeRendering
 
             volumeMaterial.SetFloat("EdgeThreshold", edgeDetectionThreshold);
 
-            SetupVolumeTracing(camera, renderer.localToWorldMatrix);
-
-            UpdateRaymarchMaterial();
+            UpdateTracingParameters(camera, renderer.localToWorldMatrix);
         }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
@@ -294,46 +267,49 @@ namespace VolumeRendering
         }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
-        public void UpdateRenderingProperties(Camera camera, Matrix4x4 mWorld)
-        {
-            SetupVolumeTracing(camera, mWorld);
-
-            UpdateRaymarchMaterial();
-        }
-
-        //-----------------------------------------------------------------------------------------------------------------------------------------
-        private void SetupVolumeTracing(Camera camera, Matrix4x4 mWorld)
+        private void UpdateTracingParameters(Camera camera, Matrix4x4 mWorld)
         {
             Matrix4x4 V = camera.worldToCameraMatrix;
 
             Matrix4x4 MV = V * mWorld;
             Matrix4x4 invMV = Matrix4x4.Inverse(MV);
-            volumeSetup.camPos = invMV.MultiplyPoint3x4(Vector3.zero) + 0.5f * Vector3.one;
+            Vector3 camPos = invMV.MultiplyPoint3x4(Vector3.zero) + 0.5f * Vector3.one;
+            rayMarchMaterial.SetVector("_CameraTS", camPos);
 
             Matrix4x4 P = GL.GetGPUProjectionMatrix(camera.projectionMatrix, true);
-            volumeSetup.invMVP = Matrix4x4.Inverse(P * MV);
+            Matrix4x4 invMVP = Matrix4x4.Inverse(P * MV);
+            rayMarchMaterial.SetMatrix("_invMVP", invMVP);
 
             Matrix4x4 mGrid = Matrix4x4.Scale(gridScale) * V;
             Vector3 gridAxis = mGrid.GetColumn(2);
-            volumeSetup.sampleScale = 2.0f * gridAxis.magnitude;
+            float sampleScale = 2.0f * gridAxis.magnitude;
+            rayMarchMaterial.SetFloat("_SampleScale", sampleScale);
 
-            volumeSetup.camNearPos = CaluclateNearPlanePosition(camera);
+            Vector3 camNearPos = CaluclateNearPlanePosition(camera);
+            rayMarchMaterial.SetVector("_NearPlanePos", camNearPos);
         }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
-        private void UpdateRaymarchMaterial()
+        private Vector3 CaluclateNearPlanePosition(Camera camera)
         {
-            rayMarchMaterial.SetFloat("_SampleScale", volumeSetup.sampleScale);
-            rayMarchMaterial.SetMatrix("_invMVP", volumeSetup.invMVP);
-            rayMarchMaterial.SetVector("_CameraTS", volumeSetup.camPos);
-            rayMarchMaterial.SetVector("_NearPlanePos", volumeSetup.camNearPos);
+            float yFac = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+            float xFac = camera.aspect * yFac;
+
+            float near = camera.nearClipPlane;
+
+            Vector3 nearPos = Vector3.forward * near;
+            nearPos += Vector3.right * near * xFac;
+            nearPos += Vector3.up * near * yFac;
+
+            return nearPos;
         }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
-        public void Apply(float absorption, float density)
+        public void Apply(float absorption, float density, float jitterStrength)
         {
             rayMarchMaterial.SetFloat("_Absorption", absorption);
             rayMarchMaterial.SetFloat("_Density", density);
+            rayMarchMaterial.SetFloat("_JitterStrength", jitterStrength);
         }
     }
 }
