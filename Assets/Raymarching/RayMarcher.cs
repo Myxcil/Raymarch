@@ -32,7 +32,6 @@ namespace VolumeRendering
         private const int BLUR_PASS_VERTICAL = 2;
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
-        private Texture2D jitterTex;
         private RenderTexture rayMarchRenderTarget;
         private RenderTargetIdentifier idRayMarchRenderTarget;
         private readonly Vector3 gridScale;
@@ -53,8 +52,6 @@ namespace VolumeRendering
         public RayMarcher(RenderTexture volumeTexture, Vector3 volumeSize, int raycastResolution, Shader volume, Shader raymarch, Shader blur)
         {
             CreateRenderTargets(raycastResolution);
-
-            CreateNoiseTexture(256);
 
             Vector3 v = new Vector3(volumeTexture.width, volumeTexture.height, volumeTexture.volumeDepth);
             float maxDim = Mathf.Max(Mathf.Max(v.x, v.y), v.z);
@@ -79,7 +76,6 @@ namespace VolumeRendering
 
             rayMarchMaterial = new Material(raymarch);
             rayMarchMaterial.SetTexture("_Volume", volumeTexture);
-            rayMarchMaterial.SetTexture("_JitterTex", jitterTex);
             rayMarchMaterial.SetVector("_GridDim", gridDim);
             rayMarchMaterial.SetVector("_rcpGridDim", rcpGridDim);
 
@@ -141,25 +137,6 @@ namespace VolumeRendering
         }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
-        private void CreateNoiseTexture(int resolution)
-        {
-            jitterTex = new Texture2D(resolution, resolution, TextureFormat.ARGB32, false)
-            {
-                name = "JitterTex",
-                hideFlags = HideFlags.HideAndDontSave
-            };
-
-            Color32[] pixels = jitterTex.GetPixels32();
-            for (int i = 0; i < pixels.Length; ++i)
-            {
-                pixels[i] = new Color(Random.value, Random.value, Random.value, Random.value);
-            }
-
-            jitterTex.SetPixels32(pixels);
-            jitterTex.Apply();
-        }
-
-        //-----------------------------------------------------------------------------------------------------------------------------------------
         public void Destroy()
         {
             foreach(var kv in cameraCommands)
@@ -218,17 +195,27 @@ namespace VolumeRendering
         //-----------------------------------------------------------------------------------------------------------------------------------------
         private void FillCommandBuffer(CommandBuffer cmdVolume, MeshRenderer renderer)
         {
+            // Step 1: 
+            // Render first the backfaces and then the front faces of the mesh
+            // This will create a rendertarget which stores the ray origins (RGB) and 
+            // tracing depth (W) for the scene
             cmdVolume.SetRenderTarget(idRayData);
             cmdVolume.ClearRenderTarget(false, true, Color.clear);
             cmdVolume.DrawRenderer(renderer, volumeMaterial, 0, VOLUME_PASS_BACK_FACES);
             cmdVolume.DrawRenderer(renderer, volumeMaterial, 0, VOLUME_PASS_FRONT_FACES);
 
+            // Step 2:
+            // If we do the raymarching at a smaller resolution than the current one,
+            // run and edge filter over it to determine parts of the images which would 
+            // create artifacts because of the lower resolution of the final raymarched image
             if (rayDataSmall != null)
             {
                 cmdVolume.Blit(idRayData, idRayDataSmall);
                 cmdVolume.Blit(idRayDataSmall, idRayEdges, volumeMaterial, VOLUME_PASS_EDGE_FILTER);
             }
             
+            // Step 3:
+            // Do the actual raymarching and create an intermediate output
             if (rayDataSmall != null)
             {
                 cmdVolume.Blit(idRayDataSmall, idRayMarchRenderTarget, rayMarchMaterial, RAYMARCH_PASS_RAYCAST_VOLUME);
@@ -238,7 +225,8 @@ namespace VolumeRendering
                 cmdVolume.Blit(idRayData, idRayMarchRenderTarget, rayMarchMaterial, RAYMARCH_PASS_RAYCAST_VOLUME);
             }
 
-            // Render volume data
+            // Step 4:
+            // Combine the raymarching result with the edge cases which will be raycasted at a higher resolution
             if (rayEdges != null)
             {
                 cmdVolume.SetGlobalTexture("_EdgeLookup", idRayEdges);
@@ -250,7 +238,8 @@ namespace VolumeRendering
                 cmdVolume.Blit(idRayMarchRenderTarget, idRayMarchLayer, rayMarchMaterial, RAYMARCH_PASS_COMBINE_SCENE_SIMPLE);
             }
 
-            // Blur result
+            // Step 5:
+            // Blur the resulting texture, which will then be rendered into the scene afterwards
             if (currBlurPasses > 0)
             {
                 int idTempBlur = Shader.PropertyToID("_BlurTemp");
@@ -271,20 +260,24 @@ namespace VolumeRendering
         {
             Matrix4x4 V = camera.worldToCameraMatrix;
 
+            // Camera position in Volume-Space
             Matrix4x4 MV = V * mWorld;
             Matrix4x4 invMV = Matrix4x4.Inverse(MV);
             Vector3 camPos = invMV.MultiplyPoint3x4(Vector3.zero) + 0.5f * Vector3.one;
             rayMarchMaterial.SetVector("_CameraTS", camPos);
 
+            // Inverse World-View-Projection matrix
             Matrix4x4 P = GL.GetGPUProjectionMatrix(camera.projectionMatrix, true);
             Matrix4x4 invMVP = Matrix4x4.Inverse(P * MV);
             rayMarchMaterial.SetMatrix("_invMVP", invMVP);
 
+            // Scale factor to determine the amount of samples along a ray
             Matrix4x4 mGrid = Matrix4x4.Scale(gridScale) * V;
             Vector3 gridAxis = mGrid.GetColumn(2);
             float sampleScale = 2.0f * gridAxis.magnitude;
             rayMarchMaterial.SetFloat("_SampleScale", sampleScale);
 
+            // calculate near plane position for raycasting when inside volume
             Vector3 camNearPos = CaluclateNearPlanePosition(camera);
             rayMarchMaterial.SetVector("_NearPlanePos", camNearPos);
         }
@@ -305,11 +298,10 @@ namespace VolumeRendering
         }
 
         //-----------------------------------------------------------------------------------------------------------------------------------------
-        public void Apply(float absorption, float density, float jitterStrength)
+        public void Apply(float absorption, float density)
         {
             rayMarchMaterial.SetFloat("_Absorption", absorption);
             rayMarchMaterial.SetFloat("_Density", density);
-            rayMarchMaterial.SetFloat("_JitterStrength", jitterStrength);
         }
     }
 }

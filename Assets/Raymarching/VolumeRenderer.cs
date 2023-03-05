@@ -28,8 +28,6 @@ namespace VolumeRendering
         //----------------------------------------------------------------------------------------------------------------------------------------------
         [Header("Runtime Parameter")]
         [SerializeField]
-        private float jitterStrength = 1.0f;
-        [SerializeField]
         private float absorption = 0.5f;
         [SerializeField]
         private float density = 0.75f;
@@ -75,7 +73,7 @@ namespace VolumeRendering
             volumeTexture.volumeDepth = depth;
             volumeTexture.enableRandomWrite = true;
             volumeTexture.wrapMode = TextureWrapMode.Clamp;
-            volumeTexture.filterMode = FilterMode.Bilinear;
+            volumeTexture.filterMode = FilterMode.Point;
             volumeTexture.Create();
 
             // initialize the raymarching
@@ -114,7 +112,7 @@ namespace VolumeRendering
         {
             if (rayMarcher != null)
             {
-                rayMarcher.Apply(absorption, density, jitterStrength);
+                rayMarcher.Apply(absorption, density);
             }
         }
 

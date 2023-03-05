@@ -258,7 +258,6 @@ MonoBehaviour:
   raymarch: {fileID: 4800000, guid: 1d6d9a1c8e2d21941887cf2b665d477a, type: 3}
   raycastResolution: 2
   blur: {fileID: 4800000, guid: 403560e8d5f20e647ad312127ae0cc2c, type: 3}
-  jitterStrength: 1
   absorption: 1
   density: 0.05
   edgeDetectionThreshold: 0.01
